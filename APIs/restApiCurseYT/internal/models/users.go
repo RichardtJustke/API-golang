@@ -7,3 +7,8 @@ type User struct {
 	Name string
 	Age  int
 }
+
+type CreatUserRequest struct{
+	Name string
+	Age int 
+}
