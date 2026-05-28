@@ -1,6 +1,7 @@
 package usecases
 
 import (
+	"errors"
 	"rest-api-yt/internal/models"
 	"rest-api-yt/internal/repositories"
 
@@ -24,6 +25,12 @@ func (u UseCases) GetAll() []models.User {
 }
 
 func (u UseCases) Add(newUser models.User) uuid.UUID {
+	exist := u.repos.User.EmailExists(newUser.Email)
+	if exist{
+		slog.Error("thiss user already exists", "email", newUser.Email)
+
+		return uuid.Nil, errors.New("user already exist")
+	}
 	repoReq := models.User{
 		ID:   uuid.New(),
 		Name: newUser.Name,
@@ -31,5 +38,6 @@ func (u UseCases) Add(newUser models.User) uuid.UUID {
 	}
 
 	u.repos.User.Add(repoReq)
-	return repoReq.ID
+
+	return repoReq.ID, nil
 }
