@@ -16,7 +16,7 @@ func (u Users) GetAll() []models.User {
 	return u.users
 }
 
-func (u Users) EmailExist(email string) bool {
+func (u Users) EmailExists(email string) bool {
 	for _, v := range u.users {
 		if v.Email == email {
 			return true
