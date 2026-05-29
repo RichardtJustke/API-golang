@@ -1,4 +1,4 @@
-🚀 Go API Studies
+Go API Studies
 
 Repositório criado para documentar minha jornada estudando desenvolvimento de APIs em Go, explorando desde a base com net/http até frameworks modernos e performáticos como Gin e Fiber.
 

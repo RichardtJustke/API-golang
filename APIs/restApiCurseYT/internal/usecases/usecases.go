@@ -13,6 +13,8 @@ type UseCases struct {
 	repos *repositories.Repositories
 }
 
+var ErrUserAlreadyExists = errors.New("user already exist")
+
 func New(repos *repositories.Repositories) *UseCases {
 	return &UseCases{
 		repos: repos,
@@ -25,16 +27,17 @@ func (u UseCases) GetAll() []models.User {
 	return users
 }
 
-func (u UseCases) Add(newUser models.User) (uuid.UUID, error) {
+func (u UseCases) Add(newUser models.CreatUserRequest) (uuid.UUID, error) {
 	exist := u.repos.User.EmailExists(newUser.Email)
 	if exist {
 		slog.Error("thiss user already exists", "email", newUser.Email)
 
-		return uuid.Nil, errors.New("user already exist")
+		return uuid.Nil, ErrUserAlreadyExists
 	}
 	repoReq := models.User{
-		ID:   uuid.New(),
-		Name: newUser.Name,
+		ID:    uuid.New(),
+		Name:  newUser.Name,
+		Email: newUser.Email,
 	}
 
 	u.repos.User.Add(repoReq)
