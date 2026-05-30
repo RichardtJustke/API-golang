@@ -19,6 +19,7 @@ func New(services *services.Services) *Handlers {
 		mux:      http.NewServeMux(),
 	}
 
+	h.registerAuthEndpoints()
 	h.registerUserEndpoints()
 
 	return h
@@ -26,5 +27,5 @@ func New(services *services.Services) *Handlers {
 
 func (h *Handlers) Listen(port int) error {
 	slog.Info("api iniciada", "port", port)
-	return http.ListenAndServe(fmt.Sprintf(":%d", port), h.withCORS(h.mux))
+	return http.ListenAndServe(fmt.Sprintf(":%d", port), h.withCORS(h.withAuth(h.mux)))
 }
