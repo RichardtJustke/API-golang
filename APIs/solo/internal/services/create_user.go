@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,7 +38,7 @@ func (s *Services) CreateUser(ctx context.Context, req models.CreateUserRequest)
 	}
 
 	if req.IDContrato == "" {
-		req.IDContrato = generateContractID()
+		req.IDContrato = s.generateContractID(ctx)
 	}
 
 	user := &models.User{
@@ -52,7 +53,7 @@ func (s *Services) CreateUser(ctx context.Context, req models.CreateUserRequest)
 	}
 
 	err := s.repos.DB.QueryRowContext(ctx, `
-		INSERT INTO users (nome, cpf, data_nascimento, email, senha_hash, status_contrato, id_contrato, ativo)
+		INSERT INTO usuarios (nome, cpf, data_nascimento, email, senha_hash, status_contrato, id_contrato, ativo)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, criado_em, atualizado_em
 	`, user.Nome, user.CPF, user.DataNascimento, user.Email, user.SenhaHash, user.StatusContrato, user.IDContrato, user.Ativo).
@@ -72,6 +73,34 @@ func (s *Services) CreateUser(ctx context.Context, req models.CreateUserRequest)
 }
 
 func generateContractID() string {
+	// kept for backward compatibility if ever used elsewhere
 	now := time.Now().UTC()
-	return fmt.Sprintf("CTR-%s-%04d", now.Format("200601"), now.Nanosecond()%10000)
+	return fmt.Sprintf("CTR-%s-%04d", now.Format("2006"), now.Nanosecond()%10000)
+}
+
+// generateContractID generates a contract id in the format CTR-YYYY-0001
+// It queries the database for the current max id for the year and increments it.
+func (s *Services) generateContractID(ctx context.Context) string {
+	year := time.Now().UTC().Format("2006")
+	pattern := fmt.Sprintf("CTR-%s-%%", year)
+
+	var last string
+	err := s.repos.DB.QueryRowContext(ctx, `
+		SELECT id_contrato
+		FROM usuarios
+		WHERE id_contrato LIKE $1
+		ORDER BY id_contrato DESC
+		LIMIT 1
+	`, pattern).Scan(&last)
+	next := 1
+	if err == nil && last != "" {
+		parts := strings.Split(last, "-")
+		if len(parts) == 3 {
+			if n, perr := strconv.Atoi(parts[2]); perr == nil {
+				next = n + 1
+			}
+		}
+	}
+
+	return fmt.Sprintf("CTR-%s-%04d", year, next)
 }

@@ -12,7 +12,7 @@ func (s *Services) FindUsers(ctx context.Context, params models.SearchUserParams
 	query := strings.Builder{}
 	query.WriteString(`
 		SELECT id, nome, cpf, data_nascimento, email, senha_hash, status_contrato, id_contrato, ativo, ultimo_login, criado_em, atualizado_em
-		FROM users
+		FROM usuarios
 	`)
 
 	args := make([]any, 0, 8)

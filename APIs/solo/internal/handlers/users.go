@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -24,13 +25,15 @@ func (h *Handlers) registerUserEndpoints() {
 		}
 	})
 
-	h.mux.HandleFunc("/users/contracts/cancel", func(w http.ResponseWriter, r *http.Request) {
+	// cancel endpoint removed; use /users/contracts/status for status changes
+
+	h.mux.HandleFunc("/users/contracts/status", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPatch {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
 
-		h.cancelContract(w, r)
+		h.changeContractStatus(w, r)
 	})
 }
 
@@ -73,7 +76,23 @@ func (h *Handlers) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, user)
+	// format response dates to Brazilian format
+	resp := map[string]any{
+		"id":              user.ID,
+		"nome":            user.Nome,
+		"cpf":             user.CPF,
+		"data_nascimento": formatDate(user.DataNascimento),
+		"email":           user.Email,
+		"senha_hash":      user.SenhaHash,
+		"status_contrato": user.StatusContrato,
+		"id_contrato":     user.IDContrato,
+		"ativo":           user.Ativo,
+		"ultimo_login":    formatNullTime(user.UltimoLogin),
+		"criado_em":       formatDateTime(user.CriadoEm),
+		"atualizado_em":   formatDateTime(user.AtualizadoEm),
+	}
+
+	writeJSON(w, http.StatusCreated, resp)
 }
 
 func (h *Handlers) findUsers(w http.ResponseWriter, r *http.Request) {
@@ -89,7 +108,26 @@ func (h *Handlers) findUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, users)
+	// format dates for response
+	out := make([]map[string]any, 0, len(users))
+	for _, u := range users {
+		out = append(out, map[string]any{
+			"id":              u.ID,
+			"nome":            u.Nome,
+			"cpf":             u.CPF,
+			"data_nascimento": formatDate(u.DataNascimento),
+			"email":           u.Email,
+			"senha_hash":      u.SenhaHash,
+			"status_contrato": u.StatusContrato,
+			"id_contrato":     u.IDContrato,
+			"ativo":           u.Ativo,
+			"ultimo_login":    formatNullTime(u.UltimoLogin),
+			"criado_em":       formatDateTime(u.CriadoEm),
+			"atualizado_em":   formatDateTime(u.AtualizadoEm),
+		})
+	}
+
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (h *Handlers) cancelContract(w http.ResponseWriter, r *http.Request) {
@@ -107,6 +145,28 @@ func (h *Handlers) cancelContract(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "contrato cancelado com sucesso"})
+}
+
+type changeStatusPayload struct {
+	IDContrato string `json:"id_contrato"`
+	Status     string `json:"status"`
+}
+
+func (h *Handlers) changeContractStatus(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	var req changeStatusPayload
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "json invalido"})
+		return
+	}
+
+	if err := h.services.UpdateContractStatus(r.Context(), req.IDContrato, req.Status); err != nil {
+		h.handleServiceError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "status atualizado com sucesso"})
 }
 
 func buildSearchParams(r *http.Request) (models.SearchUserParams, error) {
@@ -176,4 +236,25 @@ func parseDate(raw string) (time.Time, error) {
 	}
 
 	return time.Parse(time.RFC3339, raw)
+}
+
+func formatDate(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format("02/01/2006")
+}
+
+func formatDateTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format("02/01/2006 15:04:05")
+}
+
+func formatNullTime(nt sql.NullTime) string {
+	if !nt.Valid {
+		return ""
+	}
+	return formatDateTime(nt.Time)
 }

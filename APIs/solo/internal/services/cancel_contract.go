@@ -16,7 +16,7 @@ func (s *Services) CancelContract(ctx context.Context, req models.CancelContract
 	}
 
 	result, err := s.repos.DB.ExecContext(ctx, `
-		UPDATE users
+		UPDATE usuarios
 		SET status_contrato = $1,
 			ativo = false,
 			atualizado_em = NOW()
@@ -48,7 +48,7 @@ func (s *Services) ContractStatus(ctx context.Context, idContrato string) (strin
 	var status string
 	err := s.repos.DB.QueryRowContext(ctx, `
 		SELECT status_contrato
-		FROM users
+		FROM usuarios
 		WHERE id_contrato = $1
 	`, idContrato).Scan(&status)
 	if err != nil {
