@@ -10,7 +10,7 @@ func (h *Handlers) withCORS(next http.Handler) http.Handler {
 	allowedOrigins := parseCSVEnv("CORS_ALLOWED_ORIGINS", "*")
 	allowedMethods := parseCSVEnv("CORS_ALLOWED_METHODS", "GET,POST,PATCH,OPTIONS")
 	allowedHeaders := parseCSVEnv("CORS_ALLOWED_HEADERS", "Content-Type,Authorization")
-	blockedURLs := parseCSVEnv("URL_BLOCK", "")
+	allowedURLs := parseCSVEnv("URL_ALLOW", "")
 
 	allowAnyOrigin := len(allowedOrigins) == 1 && allowedOrigins[0] == "*"
 	allowedOriginsSet := make(map[string]struct{}, len(allowedOrigins))
@@ -18,18 +18,18 @@ func (h *Handlers) withCORS(next http.Handler) http.Handler {
 		allowedOriginsSet[origin] = struct{}{}
 	}
 
-	blockedSet := make(map[string]struct{}, len(blockedURLs))
-	for _, url := range blockedURLs {
-		blockedSet[strings.ToLower(strings.TrimSpace(url))] = struct{}{}
+	allowedSet := make(map[string]struct{}, len(allowedURLs))
+	for _, url := range allowedURLs {
+		allowedSet[strings.ToLower(strings.TrimSpace(url))] = struct{}{}
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := strings.TrimSpace(r.Header.Get("Origin"))
 
-		if isBlockedURL(origin, blockedSet) {
+		if !isAllowedURL(origin, allowedSet) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusForbidden)
-			_, _ = w.Write([]byte(`{"error":"origem bloqueada por URL_BLOCK"}`))
+			_, _ = w.Write([]byte(`{"error":"origem nao permitida por URL_ALLOW"}`))
 			return
 		}
 
@@ -73,18 +73,22 @@ func parseCSVEnv(key, fallback string) []string {
 	return result
 }
 
-func isBlockedURL(origin string, blockedSet map[string]struct{}) bool {
+func isAllowedURL(origin string, allowedSet map[string]struct{}) bool {
 	origin = strings.ToLower(strings.TrimSpace(origin))
-	if origin == "" || len(blockedSet) == 0 {
-		return false
-	}
-
-	if _, ok := blockedSet[origin]; ok {
+	if origin == "" {
 		return true
 	}
 
-	for blocked := range blockedSet {
-		if blocked != "" && strings.HasPrefix(origin, blocked) {
+	if len(allowedSet) == 0 {
+		return false
+	}
+
+	if _, ok := allowedSet[origin]; ok {
+		return true
+	}
+
+	for allowed := range allowedSet {
+		if allowed != "" && strings.HasPrefix(origin, allowed) {
 			return true
 		}
 	}
